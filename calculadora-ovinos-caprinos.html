@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dietas para Ovinocaprino</title>
+  <!-- Bootstrap 5 CDN -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Bootstrap Icons -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+  <link rel="stylesheet" href="calculadora-ovinos-caprinos.css">
+</head>
+<body>
+  <!-- LOGO E TÍTULO -->
+  <nav class="navbar navbar-light bg-white shadow-sm rounded-bottom-4 mb-3">
+    <div class="container-fluid justify-content-center">
+      <span class="navbar-brand mb-0 h1 d-flex align-items-center gap-2">
+        <span style="font-weight:700;font-size:1.22em;letter-spacing:1px;color:#157347;">Calcular Dietas para Ovinocaprino</span>
+      </span>
+    </div>
+  </nav>
+
+  <!-- MENU (Tabs) -->
+  <ul class="nav nav-tabs mb-3 rounded-3 shadow-sm nav-custom" id="mainTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+      <button class="nav-link active" id="requisitos-tab" data-bs-toggle="tab" data-bs-target="#requisitos-tab-pane" type="button" role="tab" aria-controls="requisitos-tab-pane" aria-selected="true">
+        <i class="bi bi-bar-chart-steps"></i> Requerimentos Nutricionais
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="ingredientes-tab" data-bs-toggle="tab" data-bs-target="#ingredientes-tab-pane" type="button" role="tab" aria-controls="ingredientes-tab-pane" aria-selected="false">
+        <i class="bi bi-basket"></i> Seleção de Ingredientes
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="dieta-tab" data-bs-toggle="tab" data-bs-target="#dieta-tab-pane" type="button" role="tab" aria-controls="dieta-tab-pane" aria-selected="false">
+        <i class="bi bi-calculator"></i> Formular Dieta
+      </button>
+    </li>
+  </ul>
+
+  <div class="tab-content" id="mainTabsContent">
+    <!-- TELA 1: Requisitos Nutricionais -->
+    <div class="tab-pane fade show active" id="requisitos-tab-pane" role="tabpanel" aria-labelledby="requisitos-tab" tabindex="0">
+      <div class="container pb-4">
+        <div class="card mb-3">
+          <form>
+            <div class="row g-2">
+              <div class="col-12 col-md-6 form-row-compact">
+                <label for="especie" class="form-label">
+                  <i class="bi bi-egg-fill text-success me-1"></i>Espécie
+                </label>
+                <select id="especie" class="form-select" onchange="atualizarRacas();">
+                  <option value="ovino">Ovino</option>
+                  <option value="caprino">Caprino</option>
+                </select>
+              </div>
+              <div class="col-12 col-md-6 form-row-compact">
+                <label for="raca" class="form-label">
+                  <i class="bi bi-award text-primary me-1"></i>Raça
+                </label>
+                <select id="raca" class="form-select"></select>
+              </div>
+            </div>
+            <div class="row g-2">
+              <div class="col-12 col-md-6 form-row-compact">
+                <label for="categoria" class="form-label">
+                  <i class="bi bi-person-badge text-secondary me-1"></i>Categoria
+                </label>
+                <select id="categoria" class="form-select" onchange="atualizarFases();">
+                  <option value="naoCastrado">Macho Não Castrado</option>
+                  <option value="castrado">Macho Castrado</option>
+                  <option value="femea">Fêmea</option>
+                  <option value="lactacao">Fêmea em Lactação</option>
+                  <option value="gestante">Fêmea Gestante</option>
+                </select>
+              </div>
+              <div class="col-12 col-md-6 form-row-compact">
+                <label for="fase" class="form-label">
+                  <i class="bi bi-activity text-info me-1"></i>Fase
+                </label>
+                <select id="fase" class="form-select"></select>
+              </div>
+            </div>
+            <div class="row g-2">
+              <div class="col-12 col-md-6 form-row-compact">
+                <label for="peso" class="form-label">
+                  <i class="bi bi-bar-chart-line text-secondary me-1"></i>Peso (kg)
+                </label>
+                <input type="number" id="peso" value="30" min="5" max="120" step="0.1" class="form-control">
+              </div>
+              <div class="col-12 col-md-6 form-row-compact">
+                <label for="gmd" class="form-label">
+                  <i class="bi bi-graph-up-arrow text-secondary me-1"></i>GMD (kg/d)
+                </label>
+                <input type="number" id="gmd" value="0.15" step="0.01" class="form-control">
+              </div>
+            </div>
+            <div class="row g-2 mt-2">
+              <div class="col-12 col-md-6 form-row-compact">
+                <label for="diasLactacao" id="labelDiasLactacao" class="form-label" style="display:none;">
+                  <i class="bi bi-calendar-heart text-warning me-1"></i>Dias Lact.
+                </label>
+                <input type="number" id="diasLactacao" value="30" min="1" max="200" class="form-control" style="display:none;">
+              </div>
+              <div class="col-12 col-md-6 form-row-compact">
+                <label for="litrosLeite" id="labelLitrosLeite" class="form-label" style="display:none;">
+                  <i class="bi bi-cup-straw text-warning me-1"></i>Leite (L/dia)
+                </label>
+                <input type="number" id="litrosLeite" value="1.0" min="0" max="10" step="0.01" class="form-control" style="display:none;">
+              </div>
+            </div>
+            <button class="btn btn-brand w-100 shadow-sm mt-3" style="padding:0.375rem 0.75rem;font-size:1rem;" type="button" onclick="calcularRequerimentos()">
+              <i class="bi bi-calculator"></i> Calcular Requisitos
+            </button>
+          </form>
+        </div>
+        <div class="row g-2" id="resultados"></div>
+        <div class="referencia text-center text-secondary small mt-3">
+          <i class="bi bi-bookmark-heart"></i> Modelos matemáticos baseados em:<br>
+          BR-CAPRINOS E OVINOS (UFV, 2024)<br>
+          FORMULAÇÃO DE RAÇÃO PARA OVINOS (Embrapa/Universidades)
+        </div>
+      </div>
+    </div>
+
+    <!-- NOVA ABA: Seleção de Ingredientes -->
+    <div class="tab-pane fade" id="ingredientes-tab-pane" role="tabpanel" aria-labelledby="ingredientes-tab" tabindex="0">
+      <div class="container pb-4">
+        <section class="card mb-3" id="ingredientes-section">
+          <h2 class="h5 mb-3"><i class="bi bi-basket text-warning me-1"></i>Selecione os Ingredientes</h2>
+          <button id="abrir-modal-btn" class="btn secondary mb-3" style="padding:0.375rem 0.75rem;font-size:1rem;"><i class="bi bi-plus-square"></i> Selecionar Ingredientes</button>
+          <div class="table-responsive">
+            <table id="ingredientes-table" class="table table-sm align-middle">
+              <thead>
+                <tr>
+                  <th>Nome</th><th>Tipo</th><th>Custo</th><th>%MS</th><th>PB</th><th>NDT</th><th>Ca</th><th>P</th><th>PDR</th><th></th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </section>
+        <section class="card mb-3" id="selecionar-section">
+          <h2 class="h5 mb-3"><i class="bi bi-check-circle text-success me-1"></i>Ingredientes Selecionados e Limites Individuais</h2>
+          <form id="selecionar-form">
+            <div id="ingredientes-selecao-list"></div>
+          </form>
+        </section>
+      </div>
+    </div>
+
+    <!-- TELA 3: Cálculo da Dieta -->
+    <div class="tab-pane fade" id="dieta-tab-pane" role="tabpanel" aria-labelledby="dieta-tab" tabindex="0">
+      <div class="container pb-4">
+        <section class="card mb-3" id="animal-section">
+          <h2 class="h5 mb-3"><i class="bi bi-patch-question-fill text-success me-1"></i>Animais no Rebanho</h2>
+          <form id="animal-form">
+            <div class="row g-2">
+              <div class="col-12 col-md-6">
+                <label for="num-animais" class="form-label"><i class="bi bi-fork-knife text-success me-1"></i>A dieta será para quantos animais?</label>
+                <input type="number" id="num-animais" min="1" value="1" class="form-control" required>
+              </div>
+            </div>
+          </form>
+        </section>
+        <section class="card mb-3" id="limites-section">
+          <h2 class="h5 mb-3"><i class="bi bi-sliders text-info me-1"></i>Limites da Dieta</h2>
+          <form id="limites-form">
+            <div class="grid-limites">
+              <div>
+                <label><i class="bi bi-egg-fried text-warning"></i> PB (%MS):</label>
+                <input type="number" id="pb-min"  placeholder="mín" step="0.1" required>
+                <input type="number" id="pb-max"  placeholder="máx" step="0.1" required>
+              </div>
+              <div>
+                <label><i class="bi bi-lightning-charge text-warning"></i> NDT (%MS):</label>
+                <input type="number" id="ndt-min"  placeholder="mín" step="0.1" required>
+                <input type="number" id="ndt-max"  placeholder="máx" step="0.1" required>
+              </div>
+              <div>
+                <label><i class="bi bi-eyedropper text-primary"></i> Ca (%MS):</label>
+                <input type="number" id="ca-min" placeholder="mín" step="0.01" required>
+                <input type="number" id="ca-max" placeholder="máx" step="0.01" required>
+              </div>
+              <div>
+                <label><i class="bi bi-droplet-half text-info"></i> P (%MS):</label>
+                <input type="number" id="p-min" placeholder="mín" step="0.01" required>
+                <input type="number" id="p-max" placeholder="máx" step="0.01" required>
+              </div>
+            </div>
+          </form>
+        </section>
+        <section class="card mb-3 actions flex-column flex-md-row" id="acoes-section">
+          <button id="calcular-btn" class="btn btn-brand" style="padding:0.375rem 0.75rem;font-size:1rem;"><i class="bi bi-bar-chart"></i> Calcular Dieta</button>
+          <button id="limpar-btn" class="btn secondary" style="padding:0.375rem 0.75rem;font-size:1rem;"><i class="bi bi-x-lg"></i> Limpar Campos</button>
+        </section>
+        <section class="card mb-3" id="resultado-section" style="display:none;">
+          <h2 class="h5 mb-3"><i class="bi bi-clipboard-check text-success me-1"></i>Resultados da Dieta</h2>
+          <div id="resultados-formulacao"></div>
+          <div id="botoes-exportar" class="d-flex flex-column flex-sm-row justify-content-center gap-2 mt-3" style="display:none;">
+            <button id="exportar-btn" class="btn secondary" type="button" style="padding:0.375rem 0.75rem;font-size:1rem;"><i class="bi bi-printer"></i> Imprimir Relatório</button>
+            <button id="mistura-btn" class="btn secondary" type="button" style="padding:0.375rem 0.75rem;font-size:1rem;"><i class="bi bi-basket"></i> Imprimir Mistura</button>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Ingredientes -->
+  <div id="modal-ingredientes" class="modal-bg">
+    <div class="modal-content">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="h5 mb-0"><i class="bi bi-list-check text-success me-2"></i>Selecionar e Editar Ingredientes</h2>
+        <button id="fechar-modal-btn" title="Fechar" style="font-size:1.5em;line-height:1;">×</button>
+      </div>
+      <form id="modal-ingredientes-form">
+        <div id="modal-ingredientes-list"></div>
+        <div class="text-end mt-3">
+          <button type="submit" class="btn btn-brand add-btn" style="padding:0.375rem 0.75rem;font-size:1rem;"><i class="bi bi-check-lg"></i> Aplicar Seleção</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Spinner de carregamento -->
+  <div id="spinner-busca" style="display:none;position:fixed;z-index:9999;top:0;left:0;width:100vw;height:100vh;background:#fff8fbe6;align-items:center;justify-content:center;">
+    <div style="display:flex;flex-direction:column;align-items:center;">
+      <div class="loader"></div>
+      <span style="margin-top:1em;color:#2d9c72;font-weight:600;">
+        <i class="bi bi-hourglass-split me-1"></i>Calculando melhor combinação...
+      </span>
+    </div>
+  </div>
+  <!-- Bootstrap JS bundle -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="calculadora-ovinos-caprinos.js"></script>
+</body>
+</html>
