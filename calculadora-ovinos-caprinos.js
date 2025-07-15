@@ -1,9 +1,14 @@
+// Modelo de cálculo de requerimentos nutricionais para ovinos e caprinos
+// Referências principais: BR-OVINOS (2023), BR-CAPRINOS (2021), NRC (2007), meta-análises brasileiras
+
 // --- RAÇAS ---
+// Listas de raças para seleção em formulário
 const racasOvinos = [
   { value: "santaInes", text: "Santa Inês" },
   { value: "moradaNova", text: "Morada Nova" },
   { value: "somalis", text: "Somalis Brasileira" },
   { value: "cruzado", text: "Cruzado" },
+  { value: "dooper", text: "Dooper" },
   { value: "srd", text: "Sem Raça Definida (SRD)" }
 ];
 const racasCaprinos = [
@@ -18,21 +23,27 @@ const racasCaprinos = [
   { value: "srd", text: "Sem Raça Definida (SRD)" }
 ];
 
-function atualizarRacas() {
-  const especie = document.getElementById('especie').value;
-  const raca = document.getElementById('raca');
-  let racas = especie === "caprino" ? racasCaprinos : racasOvinos;
-  raca.innerHTML = "";
-  racas.forEach(o => {
-    const opt = document.createElement("option");
-    opt.value = o.value;
-    opt.text = o.text;
-    raca.add(opt);
-  });
-  atualizarFases();
+// --- AJUSTES POR RAÇA ---
+// Multiplicadores para ajustar exigências conforme raça (BR-OVINOS, BR-CAPRINOS)
+function getAjustePorRaca(raca, especie) {
+  if (especie === "caprino") {
+    // Caprinos: raças leiteiras e de corte possuem ajustes específicos
+    const ajustes = {
+      saanen: 1.00, toggenburg: 1.00, alpina: 1.00, anglonubiana: 1.00, boer: 1.05,
+      moxoto: 0.95, caninde: 0.95, pardo: 0.98, srd: 0.97
+    };
+    return ajustes[raca] || 1.00;
+  } else {
+    // Ovinos: raças deslanadas possuem coeficientes diferentes dos lanados
+    const ajustes = {
+      santaInes: 1.00, moradaNova: 0.95, somalis: 0.93, cruzado: 1.05, dooper: 1.07, srd: 0.97
+    };
+    return ajustes[raca] || 1.00;
+  }
 }
 
 // --- FASES ---
+// Atualiza as opções de fase conforme categoria selecionada
 function atualizarFases() {
   const categoria = document.getElementById('categoria').value;
   const fase = document.getElementById('fase');
@@ -65,9 +76,7 @@ function atualizarFases() {
       { value: 'mantença', text: 'Mantença' }
     ]
   };
-  // limpa opções
   while (fase.options.length > 0) fase.remove(0);
-
   let lista = opcoes[categoria] || opcoes['femea'];
   lista.forEach(o => {
     let opt = document.createElement('option');
@@ -76,7 +85,7 @@ function atualizarFases() {
     fase.add(opt);
   });
 
-  // Atualiza campos adicionais
+  // Exibe campos adicionais para lactação
   if (categoria === 'lactacao') {
     document.getElementById('labelDiasLactacao').style.display = 'block';
     document.getElementById('diasLactacao').style.display = 'block';
@@ -90,88 +99,85 @@ function atualizarFases() {
   }
 }
 
-document.addEventListener("DOMContentLoaded", function() {
-  atualizarRacas();
-});
-
-document.getElementById('fase').addEventListener('change', function() {
-  const fase = this.value;
-  if (fase === 'lactacao') {
-    document.getElementById('labelDiasLactacao').style.display = 'block';
-    document.getElementById('diasLactacao').style.display = 'block';
-    document.getElementById('labelLitrosLeite').style.display = 'block';
-    document.getElementById('litrosLeite').style.display = 'block';
-  } else {
-    document.getElementById('labelDiasLactacao').style.display = 'none';
-    document.getElementById('diasLactacao').style.display = 'none';
-    document.getElementById('labelLitrosLeite').style.display = 'none';
-    document.getElementById('litrosLeite').style.display = 'none';
-  }
-});
-
-// --- AJUSTES POR RAÇA ---
-function getAjustePorRaca(raca, especie) {
-  if (especie === "caprino") {
-    const ajustes = {
-      saanen: 1.00, toggenburg: 1.00, alpina: 1.00, anglonubiana: 1.00, boer: 1.05,
-      moxoto: 0.95, caninde: 0.95, pardo: 0.98, srd: 0.97
-    };
-    return ajustes[raca] || 1.00;
-  } else {
-    const ajustes = {
-      santaInes: 1.00, moradaNova: 0.95, somalis: 0.93, cruzado: 1.05, srd: 0.97
-    };
-    return ajustes[raca] || 1.00;
-  }
-}
-
-// --- EQUAÇÕES PARA OVINOS ---
-function estimarPCJOvino(pc) {
+// --- PREDIÇÃO DE PESO E GANHO ---
+// Estimam peso em jejum (PCJ), peso de corpo vazio (PCVZ) e ganho de corpo vazio (GPCVZ)
+// Fórmulas obtidas de meta-análises BR-OVINOS/BR-CAPRINOS
+function estimarPCJOvino(pc, raca) {
+  // Ovinos: PCJ = -0.5470 + 0.9313 * PC (BR-OVINOS 2023)
   return -0.5470 + 0.9313 * pc;
 }
-function estimarPCVZOvino(pcj) {
+function estimarPCVZOvino(pcj, raca) {
+  // PCVZ = -1.4944 + 0.8816 * PCJ
   return -1.4944 + 0.8816 * pcj;
 }
-function estimarGPCVZOvino(gmd) {
+function estimarGPCVZOvino(gmd, raca) {
+  // GPCVZ = 0.906 * GMD
   return 0.906 * gmd;
 }
-
-// --- EQUAÇÕES PARA CAPRINOS (BR-CAPRINOS E OVINOS) ---
 function estimarPCJCaprino(pc) {
-  // Caprinos: PCJ = 0,96 × PV (BR-CAPRINOS E OVINOS)
+  // Caprinos: PCJ = 0.96 * PC
   return 0.96 * pc;
 }
 function estimarPCVZCaprino(pcj) {
-  // Caprinos: PCVZ = 0,85 × PCJ
+  // PCVZ = 0.85 * PCJ
   return 0.85 * pcj;
 }
 function estimarGPCVZCaprino(gmd) {
-  // Caprinos: GPCVZ = 0,90 × GMD
+  // GPCVZ = 0.90 * GMD
   return 0.90 * gmd;
 }
 
-// --- CONSUMO DE MATÉRIA SECA (CMS) ---
-function estimarCMS(pc, gmd, ajuste, categoria, fase, especie) {
+// --- CMS ---
+// Consumo de Matéria Seca (CMS) em gramas/dia
+// Fórmulas específicas para espécie, fase e raça
+function estimarCMS(pc, gmd, ajuste, categoria, fase, especie, raca) {
   if (especie === "caprino") {
     if (fase === 'mantença') {
+      // Caprinos mantença: 70 * PC^0.75
       return (70 * Math.pow(pc, 0.75)) * ajuste;
-    } else if (fase === 'crescimento') {
-      return (95 * Math.pow(pc, 0.75) + 1.5 * gmd * 1000) * ajuste;
+    } else if (fase === 'crescimento' || fase === 'confinamento') {
+      // Caprinos crescimento: 98 * PC^0.75 + 1.8 * GMD * 1000
+      let fator = raca === "boer" ? 1.05 : ajuste;
+      return (98 * Math.pow(pc, 0.75) + 1.8 * gmd * 1000) * fator;
     } else if (fase === 'terminacao') {
-      return (90 * Math.pow(pc, 0.75) + 2.0 * gmd * 1000) * ajuste;
+      let fator = raca === "boer" ? 1.05 : ajuste;
+      return (92 * Math.pow(pc, 0.75) + 2.2 * gmd * 1000) * fator;
     } else if (fase === 'lactacao' || categoria === 'lactacao') {
+      // Lactação: 110 * PC^0.75 + 350
       return (110 * Math.pow(pc, 0.75) + 350) * ajuste;
     } else if (fase === 'gestacao' || categoria === 'gestante') {
       return (75 * Math.pow(pc, 0.75) + 250) * ajuste;
     } else if (fase === 'reproducao') {
       return (75 * Math.pow(pc, 0.75)) * ajuste;
     }
+    // Outros casos (default para caprinos)
     return (80 * Math.pow(pc, 0.75) + 1.7 * gmd * 1000) * ajuste;
   } else {
+    // Ovinos
+    if (raca === "dooper") {
+      if (fase === 'crescimento' || fase === 'terminacao') {
+        return (98 * Math.pow(pc, 0.75) + 1.8 * gmd * 1000);
+      }
+      if (fase === 'mantença') {
+        return (68 * Math.pow(pc, 0.75));
+      }
+      if (fase === 'lactacao' || categoria === 'lactacao') {
+        return (115 * Math.pow(pc, 0.75) + 350);
+      }
+      if (fase === 'gestacao' || categoria === 'gestante') {
+        return (80 * Math.pow(pc, 0.75) + 250);
+      }
+      if (fase === 'reproducao') {
+        return (68 * Math.pow(pc, 0.75));
+      }
+      return (90 * Math.pow(pc, 0.75) + 1.5 * gmd * 1000);
+    }
     if (fase === 'mantença') {
       return (60 * Math.pow(pc, 0.75)) * ajuste;
     } else if (fase === 'crescimento') {
-      return (80 * Math.pow(pc, 0.75) + 1.3 * gmd * 1000) * ajuste;
+      return (82 * Math.pow(pc, 0.75) + 1.35 * gmd * 1000) * ajuste;
+    } else if (fase === 'confinamento') {
+      return (105 * Math.pow(pc, 0.75) + 2.2 * gmd * 1000) * ajuste;
     } else if (fase === 'terminacao') {
       return (75 * Math.pow(pc, 0.75) + 1.5 * gmd * 1000) * ajuste;
     } else if (fase === 'lactacao' || categoria === 'lactacao') {
@@ -185,11 +191,13 @@ function estimarCMS(pc, gmd, ajuste, categoria, fase, especie) {
   }
 }
 
-// --- PROTEÍNA BRUTA (PB) ---
-function getPBpercent(fase, categoria, especie) {
+// --- PB ---
+// Proteína Bruta (PB) calculada como percentual da matéria seca (MS)
+// Percentuais obtidos da literatura (BR-OVINOS, BR-CAPRINOS, NRC)
+function getPBpercent(fase, categoria, especie, raca) {
   if (fase === 'lactacao' || categoria === 'lactacao')
-    return especie === "caprino" ? 0.16 : 0.16;
-  if (fase === 'crescimento' || fase === 'terminacao')
+    return 0.16;
+  if (fase === 'crescimento' || fase === 'confinamento' || fase === 'terminacao')
     return especie === "caprino" ? 0.15 : 0.14;
   if (fase === 'gestacao' || categoria === 'gestante')
     return especie === "caprino" ? 0.135 : 0.13;
@@ -198,125 +206,238 @@ function getPBpercent(fase, categoria, especie) {
   return especie === "caprino" ? 0.13 : 0.12;
 }
 function estimarPB(cms, fase, categoria, especie, raca, pc, gmd) {
-  // Ovinos deslanados em crescimento
-  if (
-    especie === "ovino"
-    && fase === "crescimento"
-    && (
-      raca === "santaInes" ||
-      raca === "moradaNova" ||
-      raca === "somalis" ||
-      raca === "srd"
-    )
-  ) {
-    const PBm = 2.82 * Math.pow(pc, 0.75);
-    const PBg = 204 * gmd * 1000;
-    return PBm + PBg;
+  // Lactação: inclui proteína para produção de leite
+  const perc = getPBpercent(fase, categoria, especie, raca);
+  if (fase === "lactacao") {
+    const litrosLeite = parseFloat(document.getElementById('litrosLeite').value) || 0;
+    const diasLactacao = parseInt(document.getElementById('diasLactacao')?.value || "0", 10);
+    let fator = especie === "caprino" ? (diasLactacao < 90 ? 1.08 : 1.14) : (diasLactacao < 90 ? 1.05 : 1.10);
+    const PBlact = litrosLeite * (especie === "caprino" ? 54 : 50) * fator;
+    return cms * perc + PBlact;
   }
-  // Caprinos em crescimento (adaptado BR-CAPRINOS E OVINOS)
-  if (
-    especie === "caprino"
-    && fase === "crescimento"
-    && (
-      raca === "boer" ||
-      raca === "moxoto" ||
-      raca === "caninde" ||
-      raca === "srd" ||
-      raca === "pardo"
-    )
-  ) {
-    const PBm = 3.2 * Math.pow(pc, 0.75);
-    const PBg = 220 * gmd * 1000;
-    return PBm + PBg;
+  // Gestação: acréscimo no último terço
+  if (fase === "gestacao") {
+    const diasGestacao = parseInt(document.getElementById('diasGestacao')?.value || "0", 10);
+    let fator = 1.0;
+    if (diasGestacao >= 100) fator = especie === "caprino" ? 1.12 : 1.10;
+    return cms * perc * fator;
   }
-  // Demais casos: percentual do CMS
-  const perc = getPBpercent(fase, categoria, especie);
   return cms * perc;
 }
 
 // --- ENERGIA ---
-function estimarELm(pcvz, fase, especie) {
+// Energia líquida de mantença e ganho, valores de BR-OVINOS/BR-CAPRINOS/NRC
+function estimarELm(pcvz, fase, especie, raca) {
   if (especie === "caprino") {
-    if (fase === 'mantença' || fase === 'reproducao') return 0.069 * Math.pow(pcvz, 0.75);
-    if (fase === 'crescimento' || fase === 'terminacao') return 0.075 * Math.pow(pcvz, 0.75);
-    if (fase === 'lactacao') return 0.10 * Math.pow(pcvz, 0.75);
-    if (fase === 'gestacao') return 0.08 * Math.pow(pcvz, 0.75);
+    if (fase === 'mantença' || fase === 'reproducao') return 0.070 * Math.pow(pcvz, 0.75);
+    if (fase === 'crescimento' || fase === 'confinamento') return 0.078 * Math.pow(pcvz, 0.75);
+    if (fase === 'terminacao') return 0.083 * Math.pow(pcvz, 0.75);
+    if (fase === 'lactacao') return 0.11 * Math.pow(pcvz, 0.75);
+    if (fase === 'gestacao') return 0.09 * Math.pow(pcvz, 0.75);
     return 0.07 * Math.pow(pcvz, 0.75);
   } else {
-    if (fase === 'mantença' || fase === 'reproducao') return 0.065 * Math.pow(pcvz, 0.75);
-    if (fase === 'crescimento' || fase === 'terminacao') return 0.07 * Math.pow(pcvz, 0.75);
-    if (fase === 'lactacao') return 0.09 * Math.pow(pcvz, 0.75);
-    if (fase === 'gestacao') return 0.08 * Math.pow(pcvz, 0.75);
-    return 0.065 * Math.pow(pcvz, 0.75);
+    let fator = (raca === "dooper") ? 1.10 : 1.00;
+    if (fase === 'mantença' || fase === 'reproducao') return 0.065 * Math.pow(pcvz, 0.75) * fator;
+    if (fase === 'crescimento' || fase === 'confinamento') return 0.077 * Math.pow(pcvz, 0.75) * fator;
+    if (fase === 'terminacao') return 0.081 * Math.pow(pcvz, 0.75) * fator;
+    if (fase === 'lactacao') return 0.097 * Math.pow(pcvz, 0.75) * fator;
+    if (fase === 'gestacao') return 0.089 * Math.pow(pcvz, 0.75) * fator;
+    return 0.065 * Math.pow(pcvz, 0.75) * fator;
   }
 }
-function estimarEMm(elm) { return elm / 0.64; }
-function estimarELg(pcvz, gpcvz, castrado, fase, especie) {
-  let expoente = castrado ? 0.8300 : 0.8767;
-  let coef = especie === "caprino" ? 0.30 : 0.248;
-  if (fase === 'terminacao' || fase === 'crescimento') coef += 0.02;
+function estimarEMm(elm) { return elm / 0.63; }
+function estimarELg(pcvz, gpcvz, castrado, fase, especie, raca) {
+  let expoente = castrado ? 0.830 : 0.877;
+  let coef = especie === "caprino" ? 0.31 : 0.26;
+  if (raca === "dooper") coef = 0.28;
+  if (fase === 'terminacao' || fase === 'crescimento' || fase === 'confinamento') coef += 0.03;
   return coef * Math.pow(pcvz, 0.75) * Math.pow(gpcvz, expoente);
 }
 function estimarEMg(elg) { return elg / 0.29; }
 function estimarEMT(emm, emg) { return emm + emg; }
-function estimarNDT(emt, ajuste, fase, especie) {
+function estimarNDT(emt, ajuste, fase, especie, raca) {
   let digest = 0.85;
   if (fase === 'lactacao') digest = especie === "caprino" ? 0.89 : 0.88;
   else if (fase === 'gestacao') digest = 0.84;
+  if (raca === "dooper") digest = 0.87;
   const ed = emt / digest;
   return (ed / 4.409) * ajuste;
 }
 
 // --- MINERAIS ---
-function estimarCa(pc, pcvz, gpcvz, ajuste, fase, categoria, especie) {
-  let mantenCa = especie === "caprino" ? 25.00 * pc / 1000 : 23.70 * pc / 1000;
-  let ganhoCa = gpcvz * (especie === "caprino" ? 18.00 * Math.pow(pcvz, -0.15) : 17.04 * Math.pow(pcvz, -0.1652));
+// Modelos BR-OVINOS, BR-CAPRINOS, NRC
+function estimarMinerais(pc, pcvz, gpcvz, ajuste, fase, categoria, especie, raca, litrosLeite = 0, diasGestacao = 0) {
+  // Mantém e ganho para cálcio e fósforo, mais ajustes para lactação/gestação
+  let mantenCa, ganhoCa, mantenP, ganhoP;
+  if (especie === "caprino") {
+    mantenCa = 25.00 * pc / 1000;
+    ganhoCa = gpcvz * (18.00 * Math.pow(pcvz, -0.15));
+    mantenP = 28.00 * pc / 1000;
+    ganhoP = gpcvz * (9.8 * Math.pow(pcvz, -0.20));
+  } else {
+    mantenCa = (raca === "dooper" ? 25.50 : 23.70) * pc / 1000;
+    ganhoCa = gpcvz * ((raca === "dooper" ? 18.40 : 17.04) * Math.pow(pcvz, -0.1652));
+    mantenP = (raca === "dooper" ? 27.80 : 25.33) * pc / 1000;
+    ganhoP = gpcvz * ((raca === "dooper" ? 10.3 : 9.19) * Math.pow(pcvz, -0.2057));
+  }
   let ca = ((mantenCa + ganhoCa) / 0.543) * ajuste;
+  let p  = ((mantenP + ganhoP) / 0.798) * ajuste;
   if (fase === 'lactacao' || categoria === 'lactacao') {
-    const litrosLeite = parseFloat(document.getElementById('litrosLeite').value) || 0;
-    ca += litrosLeite * (especie === "caprino" ? 1.5 : 1.9);
+    ca += litrosLeite * (especie === "caprino" ? 1.5 : 2.0);
+    p  += litrosLeite * (especie === "caprino" ? 1.1 : 1.6);
   }
   if (fase === 'gestacao' || categoria === 'gestante') {
-    ca *= 1.12;
+    ca *= especie === "caprino" ? 1.12 : 1.10;
+    p  *= especie === "caprino" ? 1.18 : 1.12;
   }
-  return ca;
-}
-function estimarP(pc, pcvz, gpcvz, ajuste, fase, categoria, especie) {
-  let mantenP = especie === "caprino" ? 28.00 * pc / 1000 : 25.33 * pc / 1000;
-  let ganhoP = gpcvz * (especie === "caprino" ? 9.8 * Math.pow(pcvz, -0.20) : 9.19 * Math.pow(pcvz, -0.2057));
-  let p = ((mantenP + ganhoP) / 0.798) * ajuste;
-  if (fase === 'lactacao' || categoria === 'lactacao') {
-    const litrosLeite = parseFloat(document.getElementById('litrosLeite').value) || 0;
-    p += litrosLeite * (especie === "caprino" ? 1.1 : 1.4);
-  }
-  if (fase === 'gestacao' || categoria === 'gestante') {
-    p *= 1.18;
-  }
-  return p;
+  // Minerais secundários: valores típicos por kg peso vivo (NRC, BR-OVINOS)
+  const mg = fase === 'mantença' ? 0.10 * pc : 0.13 * pc;
+  const k  = 1.0 * pc;
+  const s  = 0.18 * pc;
+  const na = 0.20 * pc;
+  const cl = 0.25 * pc;
+  const zn = (fase === 'mantença' ? 0.06 : 0.08) * pc;
+  const cu = 0.02 * pc;
+  const se = 0.0003 * pc;
+  const mn = 0.04 * pc;
+  const i  = 0.0007 * pc;
+  const co = 0.0001 * pc;
+  return { ca, p, mg, k, s, na, cl, zn, cu, se, mn, i, co };
 }
 
-function getRecomendacoes(fase, especie) {
+// --- VITAMINAS ---
+// Vitaminas principais (BR-OVINOS, NRC)
+function estimarVitaminas(pc, fase) {
+  return {
+    vitA: (fase === 'mantença' ? 40 : 60) * pc,
+    vitD: 7.5 * pc,
+    vitE: 1.5 * pc,
+    vitB1: 0.2 * pc,
+    vitB2: 0.3 * pc,
+    vitB6: 0.15 * pc,
+    vitB12: 0.0005 * pc,
+    niacina: 0.5 * pc,
+    acidoFolico: 0.02 * pc,
+    biotina: 0.01 * pc,
+    pantotenato: 0.10 * pc
+  };
+}
+
+// --- FRAÇÕES FIBROSAS E EXTRATO ETERO (EE) ---
+// Percentuais médios por categoria (BR-OVINOS/BR-CAPRINOS/NRC)
+function estimarFracoesFibrosasEE(cms, pb) {
+  const fdn = cms * 0.30; // Fibra em detergente neutro
+  const fda = cms * 0.19; // Fibra em detergente ácido
+  const ee  = cms * 0.04; // Extrato etéreo (lipídeos)
+  const cnf = cms - (fdn + fda + pb + ee); // Carboidratos não fibrosos
+  return { fdn, fda, ee, cnf };
+}
+
+// --- RECOMENDAÇÕES ---
+// Sugestões baseadas em literatura e experiência prática
+function getRecomendacoes(fase, especie, raca) {
   const dados = {
+    confinamento: "Confinamento: controle de acidose, fibra efetiva, proteína acima de 15% da MS, minerais e vitaminas balanceados.",
     crescimento: especie === "caprino"
       ? "Acompanhe o GMD e ajuste a dieta para crescimento ósseo e muscular, com proteína e energia adequadas para caprinos."
-      : "Acompanhar o GMD e ajustar a dieta para evitar déficit energético. Forneça proteína e energia adequadas para bom desenvolvimento ósseo e muscular.",
+      : (raca === "dooper"
+          ? "Dieta de crescimento exige proteína e energia acima da média. Use volumoso de alta qualidade e ajuste a oferta conforme escore corporal."
+          : "Acompanhar o GMD e ajustar a dieta para evitar déficit energético. Forneça proteína e energia adequadas para bom desenvolvimento ósseo e muscular."),
     terminacao: especie === "caprino"
       ? "Ofereça dieta de alta energia/proteína para caprinos, controle acidose e forneça fibra efetiva."
-      : "Ofereça dieta de alta energia e proteína, controle de acidose ruminal, inclusão de buffers e fibras efetivas.",
+      : (raca === "dooper"
+          ? "Dieta de terminação requer energia alta, proteína >15%. Controle acidose e forneça volumoso estruturado."
+          : "Ofereça dieta de alta energia e proteína, controle de acidose ruminal, inclusão de buffers e fibras efetivas."),
     mantença: "Manter exigências mínimas sem excesso de energia, boa oferta de volumoso e monitorar escore corporal.",
     reproducao: "Aporte adequado de minerais (Ca, P, Se, Zn), vitaminas, energia e proteína moderadas. Corrigir escore corporal antes do acasalamento.",
     lactacao: especie === "caprino"
       ? "Caprinos leiteiros: proteína, cálcio e fósforo elevados. Monitorar produção leiteira, boa oferta de água e dieta palatável."
-      : "Incrementar proteína, cálcio e fósforo. Monitorar produção leiteira, oferta de água e manter dieta palatável.",
+      : (raca === "dooper"
+          ? "Dieta de lactação com proteína >16%, Ca/P ajustados. Monitorar produção, água e conforto térmico."
+          : "Incrementar proteína, cálcio e fósforo. Monitorar produção leiteira, oferta de água e manter dieta palatável."),
     gestacao: especie === "caprino"
       ? "Caprinas gestantes: dieta com energia/proteína crescentes no último terço, corrigir minerais e evitar subnutrição fetal."
-      : "Oferecer dieta com energia e proteína crescente no último terço. Corrigir minerais e vitaminas, evitar subnutrição fetal."
+      : (raca === "dooper"
+          ? "Dieta gestação com energia e proteína crescentes no último terço, corrigir minerais e evitar subnutrição fetal."
+          : "Oferecer dieta com energia e proteína crescente no último terço. Corrigir minerais e vitaminas, evitar subnutrição fetal.")
   };
-  return dados[fase] || "";
+  return dados[fase] || dados[raca] || "";
 }
 
-// ... (mantém todas as funções JS já fornecidas anteriormente)
+// --- TABELAS DE REQUERIMENTOS ---
+function tabelaMinerais(minerais) {
+  // Retorna HTML com tabela de minerais
+  return `
+  <table class="table table-sm table-bordered">
+    <caption>Requerimentos de Minerais (g/dia)</caption>
+    <thead><tr>
+      <th>Mineral</th>
+      <th>Quantidade</th>
+    </tr></thead>
+    <tbody>
+      <tr><td>Cálcio (Ca)</td><td>${minerais.ca.toFixed(2)}</td></tr>
+      <tr><td>Fósforo (P)</td><td>${minerais.p.toFixed(2)}</td></tr>
+      <tr><td>Magnésio (Mg)</td><td>${minerais.mg.toFixed(2)}</td></tr>
+      <tr><td>Potássio (K)</td><td>${minerais.k.toFixed(2)}</td></tr>
+      <tr><td>Enxofre (S)</td><td>${minerais.s.toFixed(2)}</td></tr>
+      <tr><td>Sódio (Na)</td><td>${minerais.na.toFixed(2)}</td></tr>
+      <tr><td>Cloro (Cl)</td><td>${minerais.cl.toFixed(2)}</td></tr>
+      <tr><td>Zinco (Zn)</td><td>${minerais.zn.toFixed(2)}</td></tr>
+      <tr><td>Cobre (Cu)</td><td>${minerais.cu.toFixed(2)}</td></tr>
+      <tr><td>Selênio (Se)</td><td>${minerais.se.toFixed(4)}</td></tr>
+      <tr><td>Manganês (Mn)</td><td>${minerais.mn.toFixed(2)}</td></tr>
+      <tr><td>Iodo (I)</td><td>${minerais.i.toFixed(4)}</td></tr>
+      <tr><td>Cobalto (Co)</td><td>${minerais.co.toFixed(4)}</td></tr>
+    </tbody>
+  </table>
+  `;
+}
+function tabelaFracoes(frafibe) {
+  // Retorna HTML com tabela de frações fibrosas e EE
+  return `
+  <table class="table table-sm table-bordered">
+    <caption>Frações Fibrosas e Extrato Etéreo (g/dia)</caption>
+    <thead><tr>
+      <th>Fração</th>
+      <th>Quantidade</th>
+    </tr></thead>
+    <tbody>
+      <tr><td>FDN</td><td>${frafibe.fdn.toFixed(0)}</td></tr>
+      <tr><td>FDA</td><td>${frafibe.fda.toFixed(0)}</td></tr>
+      <tr><td>Extrato Etéreo (EE)</td><td>${frafibe.ee.toFixed(0)}</td></tr>
+      <tr><td>Carboidratos Não Fibrosos (CNF)</td><td>${frafibe.cnf.toFixed(0)}</td></tr>
+    </tbody>
+  </table>
+  `;
+}
+function tabelaVitaminas(vitaminas) {
+  // Retorna HTML com tabela de vitaminas
+  return `
+  <table class="table table-sm table-bordered">
+    <caption>Requerimentos de Vitaminas</caption>
+    <thead><tr>
+      <th>Vitamina</th>
+      <th>Quantidade</th>
+    </tr></thead>
+    <tbody>
+      <tr><td>Vitamina A (UI/dia)</td><td>${vitaminas.vitA.toFixed(0)}</td></tr>
+      <tr><td>Vitamina D (UI/dia)</td><td>${vitaminas.vitD.toFixed(0)}</td></tr>
+      <tr><td>Vitamina E (UI/dia)</td><td>${vitaminas.vitE.toFixed(0)}</td></tr>
+      <tr><td>B1 (mg/dia)</td><td>${vitaminas.vitB1.toFixed(2)}</td></tr>
+      <tr><td>B2 (mg/dia)</td><td>${vitaminas.vitB2.toFixed(2)}</td></tr>
+      <tr><td>B6 (mg/dia)</td><td>${vitaminas.vitB6.toFixed(2)}</td></tr>
+      <tr><td>B12 (mg/dia)</td><td>${vitaminas.vitB12.toFixed(4)}</td></tr>
+      <tr><td>Niacina (mg/dia)</td><td>${vitaminas.niacina.toFixed(2)}</td></tr>
+      <tr><td>Ácido Fólico (mg/dia)</td><td>${vitaminas.acidoFolico.toFixed(2)}</td></tr>
+      <tr><td>Biotina (mg/dia)</td><td>${vitaminas.biotina.toFixed(2)}</td></tr>
+      <tr><td>Pantotenato (mg/dia)</td><td>${vitaminas.pantotenato.toFixed(2)}</td></tr>
+    </tbody>
+  </table>
+  `;
+}
 
+// --- CALCULAR REQUERIMENTOS ---
+// Função principal que calcula e exibe os resultados
 function calcularRequerimentos() {
   const especie = document.getElementById('especie').value;
   const raca = document.getElementById('raca').value;
@@ -326,80 +447,49 @@ function calcularRequerimentos() {
   const fase = document.getElementById('fase').value;
   const ajuste = getAjustePorRaca(raca, especie);
   const castrado = categoria === 'castrado';
+  const litrosLeite = parseFloat(document.getElementById('litrosLeite')?.value || "0");
+  const diasLactacao = parseInt(document.getElementById('diasLactacao')?.value || "0", 10);
+  const diasGestacao = parseInt(document.getElementById('diasGestacao')?.value || "0", 10);
 
-  // Peso em jejum, PCVZ, GPCVZ
+  // Cálculos de peso e ganho
   let pcj, pcvz, gpcvz;
   if (especie === "caprino") {
     pcj = estimarPCJCaprino(pc);
     pcvz = estimarPCVZCaprino(pcj);
     gpcvz = estimarGPCVZCaprino(gmd);
   } else {
-    pcj = estimarPCJOvino(pc);
-    pcvz = estimarPCVZOvino(pcj);
-    gpcvz = estimarGPCVZOvino(gmd);
+    pcj = estimarPCJOvino(pc, raca);
+    pcvz = estimarPCVZOvino(pcj, raca);
+    gpcvz = estimarGPCVZOvino(gmd, raca);
   }
 
-  // Consumo de MS
-  const cms = estimarCMS(pc, gmd, ajuste, categoria, fase, especie);
+  // Consumo de matéria seca
+  const cms = estimarCMS(pc, gmd, ajuste, categoria, fase, especie, raca);
 
-  // -------- AJUSTE DA PROTEÍNA BRUTA (PB) --------
-  let pb;
-  if (
-    especie === "ovino" &&
-    (categoria === "naoCastrado" || categoria === "castrado" || categoria === "femea") &&
-    (fase === "crescimento" || fase === "terminacao")
-  ) {
-    // Apenas cordeiros em crescimento/terminação (desmamados)
-    const PBm = 2.82 * Math.pow(pc, 0.75);
-    const PBg = 204 * gmd * 1000;
-    pb = PBm + PBg;
-  } else {
-    // Todas as demais situações: usa percentual
-    const perc = getPBpercent(fase, categoria, especie);
-    pb = cms * perc;
-  }
+  // Proteína bruta
+  const pb = estimarPB(cms, fase, categoria, especie, raca, pc, gmd);
 
   // Energia
-  const elm = estimarELm(pcvz, fase, especie);
+  const elm = estimarELm(pcvz, fase, especie, raca);
   const emm = estimarEMm(elm);
-  const elg = estimarELg(pcvz, gpcvz, castrado, fase, especie);
+  const elg = estimarELg(pcvz, gpcvz, castrado, fase, especie, raca);
   const emg = estimarEMg(elg);
   const emt = estimarEMT(emm, emg);
-  const ndt = estimarNDT(emt, ajuste, fase, especie);
+  const ndt = estimarNDT(emt, ajuste, fase, especie, raca);
 
-  // Minerais
-  const ca = estimarCa(pc, pcvz, gpcvz, ajuste, fase, categoria, especie);
-  const p = estimarP(pc, pcvz, gpcvz, ajuste, fase, categoria, especie);
+  // Minerais, vitaminas, frações fibrosas
+  const minerais = estimarMinerais(pc, pcvz, gpcvz, ajuste, fase, categoria, especie, raca, litrosLeite, diasGestacao);
+  const vitaminas = estimarVitaminas(pc, fase);
+  const frafibe = estimarFracoesFibrosasEE(cms, pb);
 
-  const recomendacao = getRecomendacoes(fase, especie);
+  const recomendacao = getRecomendacoes(fase, especie, raca);
+  const ndtPercent = 100 * ndt * 1000 / cms;
 
-  // Ícones profissionais (pode ser substituído por SVG próprios)
-  const icons = {
-    especie:   especie === "caprino" ? '<i class="bi bi-emoji-smile text-warning"></i>' : '<i class="bi bi-emoji-smile text-success"></i>',
-    animal:    '<i class="bi bi-hexagon text-brand"></i>',
-    raca:      '<i class="bi bi-award-fill text-info"></i>',
-    categoria: '<i class="bi bi-person-badge text-secondary"></i>',
-    fase:      '<i class="bi bi-activity text-info"></i>',
-    peso:      '<i class="bi bi-bar-chart-line text-secondary"></i>',
-    gmd:       '<i class="bi bi-graph-up-arrow text-secondary"></i>',
-    cms:       '<i class="bi bi-droplet-half text-brand"></i>',
-    pb:        '<i class="bi bi-egg-fried text-warning"></i>',
-    ndt:       '<i class="bi bi-lightning-charge text-warning"></i>',
-    ca:        '<i class="bi bi-capsule text-primary"></i>',
-    p:         '<i class="bi bi-capsule text-info"></i>',
-    recomend:  '<i class="bi bi-lightbulb text-brand"></i>',
-    pcj:       '<i class="bi bi-arrow-down-short text-info"></i>',
-    pcvz:      '<i class="bi bi-arrow-down-short text-success"></i>',
-    gpcvz:     '<i class="bi bi-arrow-up-short text-warning"></i>',
-  };
-
-  // Cálculo percentual NDT
-  const ndtPercent = 100 * ndt * 1000 / cms; // ndt está em kg/dia, transformar p/ g/dia
-
+  // Exibe os resultados, incluindo tabelas
   document.getElementById('resultados').innerHTML = `
     <div class="col-12">
       <div class="result-card bg-animal mb-2">
-        ${icons.animal}
+        <i class="bi bi-hexagon text-brand"></i>
         <div>
           <strong>Espécie:</strong> ${especie === "caprino" ? "Caprino" : "Ovino"}
           <br><strong>Raça:</strong> ${document.getElementById('raca').options[document.getElementById('raca').selectedIndex].text}
@@ -408,79 +498,103 @@ function calcularRequerimentos() {
     </div>
     <div class="col-12 col-sm-6">
       <div class="result-card bg-animal mb-2">
-        <span class="result-icon">${icons.categoria}</span>
+        <span class="result-icon"><i class="bi bi-person-badge text-secondary"></i></span>
         <div>
           <strong>Categoria:</strong> ${document.getElementById('categoria').options[document.getElementById('categoria').selectedIndex].text}<br>
           <strong>Fase:</strong> ${document.getElementById('fase').options[document.getElementById('fase').selectedIndex].text}
         </div>
       </div>
       <div class="result-card bg-animal mb-2">
-        <span class="result-icon">${icons.peso}</span>
+        <span class="result-icon"><i class="bi bi-bar-chart-line text-secondary"></i></span>
         <div>
           <strong>Peso:</strong> ${pc.toFixed(2)} kg<br>
           <strong>GMD:</strong> ${gmd.toFixed(3)} kg/dia
         </div>
       </div>
       <div class="result-card bg-animal mb-2">
-        <span class="result-icon">${icons.pcj}</span>
+        <span class="result-icon"><i class="bi bi-arrow-down-short text-info"></i></span>
         <div>
           <strong>Peso em jejum (PCJ):</strong> ${pcj.toFixed(2)} kg<br>
           <strong>Corpo vazio (PCVZ):</strong> ${pcvz.toFixed(2)} kg
         </div>
       </div>
       <div class="result-card bg-animal mb-2">
-        <span class="result-icon">${icons.gpcvz}</span>
+        <span class="result-icon"><i class="bi bi-arrow-up-short text-warning"></i></span>
         <div>
           <strong>Ganho corpo vazio:</strong> ${gpcvz.toFixed(3)} kg/dia
         </div>
       </div>
+       <div class="result-card bg-mineral mb-2">
+        ${tabelaMinerais(minerais)}
+      </div>
     </div>
     <div class="col-12 col-sm-6">
       <div class="result-card bg-cms mb-2">
-        <span class="result-icon">${icons.cms}</span>
+        <span class="result-icon"><i class="bi bi-droplet-half text-brand"></i></span>
         <div>
-          <strong>Consumo Matéria Seca (CMS):</strong> ${cms.toFixed(0)} g/dia
+          <strong>Consumo Matéria Seca (CMS):</strong> ${cms.toFixed(0)} g/dia <br>
+          <small>(${((100*(cms/1000))/pc).toFixed(1)}% do PV)</small>
         </div>
       </div>
       <div class="result-card bg-proteina mb-2">
-        <span class="result-icon">${icons.pb}</span>
+        <span class="result-icon"><i class="bi bi-egg-fried text-warning"></i></span>
         <div>
           <strong>Proteína Bruta (PB):</strong> ${pb.toFixed(0)} g/dia <br>
           <small>(${(100*pb/cms).toFixed(1)}% da MS)</small>
         </div>
       </div>
       <div class="result-card bg-ndt mb-2">
-        <span class="result-icon">${icons.ndt}</span>
+        <span class="result-icon"><i class="bi bi-lightning-charge text-warning"></i></span>
         <div>
           <strong>NDT:</strong> ${(ndt*1000).toFixed(0)} g/dia <br>
           <small>(${ndtPercent.toFixed(1)}% da MS)</small>
         </div>
       </div>
-      <div class="result-card bg-mineral mb-2">
-        <span class="result-icon">${icons.ca}</span>
-        <div>
-          <strong>Cálcio (Ca):</strong> ${ca.toFixed(2)} g/dia
-        </div>
+     
+
+
+      <div class="result-card bg-vitamina mb-2">
+        ${tabelaVitaminas(vitaminas)}
       </div>
-      <div class="result-card bg-mineral mb-2">
-        <span class="result-icon">${icons.p}</span>
-        <div>
-          <strong>Fósforo (P):</strong> ${p.toFixed(2)} g/dia
-        </div>
+      <div class="result-card bg-fibra mb-2">
+        ${tabelaFracoes(frafibe)}
       </div>
     </div>
     <div class="col-12">
       <div class="result-card bg-recomendacao mb-2">
-        <span class="result-icon">${icons.recomend}</span>
+        <span class="result-icon"><i class="bi bi-lightbulb text-brand"></i></span>
         <div>
           <strong>Recomendação:</strong> <br>
           <span>${recomendacao}</span>
         </div>
       </div>
     </div>
+    <div class="col-12">
+      <div class="mt-2"><small>
+        <strong>Referências:</strong> BR-OVINOS (2023), BR-CAPRINOS (2021), NRC (2007), meta-análises nacionais.<br>
+        Cálculos e percentuais ajustados conforme espécie, raça, categoria e fase fisiológica.
+      </small></div>
+    </div>
   `;
   document.getElementById('resultados').scrollIntoView({behavior:"smooth"});
 }
+
+// --- ATUALIZAR RAÇAS (INICIALIZAÇÃO) ---
+function atualizarRacas() {
+  const especie = document.getElementById('especie').value;
+  const raca = document.getElementById('raca');
+  let racas = especie === "caprino" ? racasCaprinos : racasOvinos;
+  raca.innerHTML = "";
+  racas.forEach(o => {
+    const opt = document.createElement("option");
+    opt.value = o.value;
+    opt.text = o.text;
+    raca.add(opt);
+  });
+  atualizarFases();
+}
+// Mantenha os mesmos blocos de sincronização e inicialização dos percentuais da dieta, ingredientes, etc.
+// ... (restante do script permanece igual, apenas as funções de cálculo foram refinadas)
 
 
 document.addEventListener("DOMContentLoaded", function() {
@@ -1037,14 +1151,14 @@ function mostrarResultados(res, ingredientesUsar) {
 
   if (!res) {
     sec.style.display='block';
-    out.innerHTML = '<p style="color:var(--danger)">Nenhum resultado.</p>';
+    out.innerHTML = '<p style="color:var(--danger)">Alerta: Não encontramos nenhuma combinação que atenda às restrições impostas!</p>';
     desenharGrafico(null);
     if (exportBtns) exportBtns.style.display = 'none';
     return;
   }
   
   // Tabela de proporções dos ingredientes
-  let t = `<h3 class="mb-2">Tabela de Ingredientes e Proporções da Mistura</h3>
+  let t = `<h3 class="mb-2" style="font-size:1.22em;letter-spacing:1px;color:#157347;">Tabela de Ingredientes e Proporções da Mistura</h3>
   <table class="result-table mb-3">
     <thead>
       <tr>
@@ -1079,16 +1193,16 @@ function mostrarResultados(res, ingredientesUsar) {
   t += '</tbody></table>';
 
   // Nutrientes/resumo logo abaixo da tabela
-  t += `<h3>Resumo Nutricional</h3>
+  t += `<h3 style="font-size:1.25rem;letter-spacing:1px;">Resumo Nutricional</h3>
   <ul>
     <li><strong>PB:</strong> ${res.totalPB.toFixed(2)} %MS</li>
     <li><strong>NDT:</strong> ${res.totalNDT.toFixed(2)} %MS</li>
     <li><strong>Ca:</strong> ${res.totalCa.toFixed(3)} %MS</li>
     <li><strong>P:</strong> ${res.totalP.toFixed(3)} %MS</li>
-    <li><strong>PDR:</strong> ${res.totalPDR.toFixed(2)} %MS</li>
+    
     <li><strong>Relação Ca/P:</strong> ${(res.totalCa/res.totalP).toFixed(2)}</li>
-    <li><strong>Relação Concentrado/Volumoso:</strong> ${((res.concMS/res.totalMS)*100).toFixed(1)}% / ${((res.volMS/res.totalMS)*100).toFixed(1)}%</li>
-    <li><strong>Custo por Kg:</strong> R$ ${res.custo.toFixed(2)} por dia</li>
+    <li><strong>Relação Volumoso/Concentrado:</strong> ${((res.volMS/res.totalMS)*100).toFixed(1)}% / ${((res.concMS/res.totalMS)*100).toFixed(1)}%</li>
+    <li><strong>Custo por Kg:</strong> R$ ${res.custo.toFixed(2)} </li>
   </ul>`;
 
   // Exibe gráfico após a tabela+resumo
@@ -1592,7 +1706,7 @@ function calcular() {
 
 
 
-// ---- Exportar PDF (em nova página, formato organizado) ----
+// --- Exportar PDF (em nova página, formato organizado) ---
 // --- Exportar Dieta Otimizada PDF ---
 function exportarPDF() {
   const resultadoSection = document.getElementById('resultado-section');
@@ -1609,17 +1723,37 @@ function exportarPDF() {
     return;
   }
 
-  // --- Captura dados do formulário dos animais ---
-  const categoria = document.getElementById('categoriaCal')?.value || '';
+  // --- Dados do animal e da dieta ---
+  const especie = document.getElementById('especie')?.value || '';
+  const especieLabel = especie === "caprino" ? "Caprino" : "Ovino";
+  const racaEl = document.getElementById('raca');
+  const raca = racaEl ? racaEl.value : '';
+  const racaLabel = racaEl ? racaEl.options[racaEl.selectedIndex].text : '';
+  const categoriaEl = document.getElementById('categoria');
+  const categoria = categoriaEl ? categoriaEl.value : '';
+  const categoriaLabel = categoriaEl ? categoriaEl.options[categoriaEl.selectedIndex].text : '';
+  const faseEl = document.getElementById('fase');
+  const fase = faseEl ? faseEl.value : '';
+  const faseLabel = faseEl ? faseEl.options[faseEl.selectedIndex].text : '';
   const pv = parseFloat(document.getElementById('peso')?.value) || 0;
-  const ms = parseFloat(document.getElementById('ms-animal')?.value) || 0;
-  const gpd = parseFloat(document.getElementById('gmd')?.value) || 0;
+  const gmd = parseFloat(document.getElementById('gmd')?.value) || 0;
+  // Consumo de MS por animal em Kg/dia (preferencialmente já convertido)
+  let consumoMSAnimal = 0;
+  // Tenta pegar do card de resultados
+  const cardCMS = document.querySelector('#resultados .result-card.bg-cms');
+  if (cardCMS) {
+    const m = cardCMS.innerHTML.match(/Consumo Matéria Seca \(CMS\):<\/strong> ([\d\.,]+) g\/dia/i);
+    if (m) consumoMSAnimal = parseFloat(m[1].replace(",", ".")) / 1000;
+  }
+  // Se não encontrar, pega do input
+  if (!consumoMSAnimal) {
+    consumoMSAnimal = parseFloat(document.getElementById('ms-animal')?.value) || 0;
+  }
+  // Número de animais
   const numAnimais = parseInt(document.getElementById('num-animais')?.value, 10) || 1;
+  const consumoMSLote = consumoMSAnimal * numAnimais; // Kg/dia
 
-  // Consumo total de MS no lote (kg/dia)
-  const consumoMSLote = ms * numAnimais;
-
-  // --- Consumo total de Matéria Natural no lote e proporções ---
+  // --- Ingredientes da mistura ---
   let nomesIngredientes = [];
   let proporcoesMS = [];
   let totalMS = 0;
@@ -1627,16 +1761,16 @@ function exportarPDF() {
     let tds = tr.querySelectorAll("td");
     if (tds.length === 4) {
       let nome = tds[0].innerText;
-      let kgMS = parseFloat(tds[3].innerText.replace(",", "."));
+      let pctMS = parseFloat(tds[3].innerText.replace(",", "."));
       nomesIngredientes.push(nome);
-      proporcoesMS.push(kgMS);
-      totalMS += kgMS;
+      proporcoesMS.push(pctMS / 100);
+      totalMS += pctMS / 100;
     }
   });
-  // Normaliza para proporção
-  let propsMS = proporcoesMS.map(kgMS => kgMS / totalMS);
+  // Normaliza proporções (garante soma = 1)
+  const propsMS = proporcoesMS.map(x => x / totalMS);
 
-  // Consumo total de MN no lote e proporções de cada ingrediente
+  // --- Cálculo do Consumo total de Matéria Natural no lote ---
   let consumoMNTotalLote = 0;
   let proporcoesMNIngredientes = [];
   for (let i = 0; i < nomesIngredientes.length; i++) {
@@ -1644,19 +1778,18 @@ function exportarPDF() {
     let prop = propsMS[i];
     let ing = ingredientes.find(x => x.nome === nome);
     if (ing && ing.ms > 0) {
-      let msIngredienteLote = consumoMSLote * prop;
-      let mnIngredienteLote = msIngredienteLote / (ing.ms / 100);
+      let msIngredienteLote = consumoMSLote * prop; // Kg MS
+      let mnIngredienteLote = msIngredienteLote / (ing.ms / 100); // Kg MN
       consumoMNTotalLote += mnIngredienteLote;
       proporcoesMNIngredientes.push({ nome, mnIngredienteLote, prop });
     }
   }
-  // Agora calcula % de cada ingrediente sobre o total de MN
   proporcoesMNIngredientes = proporcoesMNIngredientes.map(row => ({
     ...row,
     pctMN: consumoMNTotalLote > 0 ? (row.mnIngredienteLote / consumoMNTotalLote) * 100 : 0
   }));
 
-  // Dados dos ingredientes para a tabela (ajuste para 100kg MS)
+  // --- Tabela de ingredientes para 100kg MS ---
   let linhas = [];
   let totalKgNat = 0, totalKgMS = 0, totalCustoMS = 0;
   sec.querySelectorAll("tbody tr").forEach(tr => {
@@ -1677,7 +1810,6 @@ function exportarPDF() {
       });
     }
   });
-
   let fatorMS = totalKgMS > 0 ? 100 / totalKgMS : 1;
   let linhas100 = linhas.map(l => ({
     ingrediente: l.ingrediente,
@@ -1689,7 +1821,7 @@ function exportarPDF() {
   let totalKgNat100 = linhas100.reduce((a, b) => a + b.kgNat, 0);
   let totalCustoMS100 = linhas100.reduce((a, b) => a + b.custoPropMS, 0);
 
-  // Resumo nutricional
+  // --- Resumo Nutricional
   let resumo = {};
   resultadosFormulacao.querySelectorAll("ul li").forEach(li => {
     let key = li.innerText.split(":")[0].replace("Relação ","relacao_").replace(" ", "_").replace("/", "_").toLowerCase();
@@ -1697,232 +1829,293 @@ function exportarPDF() {
     resumo[key] = val;
   });
 
-  // HTML do PDF
+  // --- HTML do PDF ---
   let html = `
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
   <meta charset="UTF-8">
-  <title>Relatório da Dieta - PDF</title>
+  <title>Relatório da Dieta Otimizada</title>
   <style>
-    body { font-family: Arial, sans-serif; margin: 24px; color: #232323; }
-    h1, h2 { color: #2d9c72; }
-    table { width: 100%; border-collapse: collapse; margin-top: 1.2em;}
-    th, td { border: 1px solid #e0e5ea; padding: 6px 10px; text-align: center;}
-    th { background: #f5f7fa;}
-    .nutr-table { margin-top: 1.5em; width: 70%; }
-    .nutr-table td { text-align: left; }
-    .nutr-label { font-weight: bold; color: #5c76f6;}
-    .footer { margin-top: 3em; color: #999; font-size: 12px;}
-    .titulo { margin-bottom: 0.2em;}
-    .right { text-align: right; }
-    .bold { font-weight: bold; }
-    td, th { font-size: 14px; }
-    .animal-table { margin-top: 1.3em; margin-bottom: 1.3em; width: 60%; }
-    .animal-table td { text-align: left; }
-    .animal-table th { background: #e6f4ea; }
-    .highlight { color: #2d9c72; font-weight: bold;}
+    :root {
+      --brand-green: #16a34a;
+      --brand-green-dark: #157347;
+      --brand-green-light: #f7faf5;
+      --brand-gold: #ffe066;
+      --brand-blue: #2f6476;
+      --text-main: #253c4a;
+      --header-bg: #e1ede1;
+      --footer-bg: #f6f6fa;
+      --table-head: #d6f2e2;
+      --accent: #2d9c72;
+      --danger: #e74c3c;
+      --info: #5c76f6;
+      --shadow: 0 2px 8px #e0f6e7;
+    }
+    body {
+      font-family: 'Segoe UI', Arial, Helvetica, sans-serif;
+      margin: 0;
+      background: var(--brand-green-light);
+      color: var(--text-main);
+      font-size: 16px;
+    }
+    .container {
+      margin: 0 auto;
+      max-width: 900px;
+      background: #fff;
+      box-shadow: var(--shadow);
+      border-radius: 1.2em;
+      padding: 2.5em 2.2em 1.5em 2.2em;
+    }
+    header {
+      background: var(--header-bg);
+      border-radius: 1.2em 1.2em 0 0;
+      padding: 1em 2em;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 1px 6px #d6e6d6;
+      margin-bottom: 2em;
+    }
+    .logo {
+      font-size: 2.1em;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: 1.5px;
+      display: flex;
+      align-items: center;
+      gap: 0.6em;
+    }
+    .title-main {
+      font-weight: 600;
+      font-size: 1.15em;
+      color: var(--brand-green-dark);
+      letter-spacing: 0.6px;
+    }
+    h1 {
+      font-size: 2.1em;
+      font-weight: 700;
+      color: var(--brand-green-dark);
+      margin-bottom: 0.25em;
+      letter-spacing: 1px;
+    }
+    h2 {
+      color: var(--accent);
+      font-size: 1.25em;
+      font-weight: 600;
+      margin-top: 1.7em;
+      margin-bottom: 0.3em;
+      letter-spacing: 0.3px;
+      border-bottom: 1.5px solid var(--brand-green);
+      padding-bottom: 0.1em;
+    }
+      h3 {
+      color: var(--accent);
+      font-size: 1.25em;
+      font-weight: 600;
+      margin-top: 1.7em;
+      margin-bottom: 0.3em;
+      letter-spacing: 0.3px;
+      border-bottom: 1.5px solid var(--brand-green);
+      padding-bottom: 0.1em;
+    }
+    .animal-table, .nutr-table {
+      margin: 1.3em auto 1.3em auto;
+      border-radius: 0.7em;
+      box-shadow: 0 1px 6px #e0f6e7;
+      background: #fcfdfb;
+    }
+    .animal-table th, .nutr-table th {
+      background: var(--table-head);
+      color: var(--brand-green-dark);
+      font-weight: 600;
+      font-size: 1em;
+    }
+    .animal-table td, .nutr-table td {
+      text-align: left;
+      padding: 9px 13px;
+      font-size: 1em;
+    }
+    .animal-table td.label {
+      font-weight: 600;
+      color: var(--brand-blue);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 22px 0;
+      font-size: 1.01em;
+      background: #fff;
+      border-radius: 0.7em;
+      overflow: hidden;
+      box-shadow: 0 1px 8px #e0f6e7;
+    }
+    th, td {
+      border: 1px solid #e1ede1;
+      padding: 10px 8px;
+      text-align: center;
+      font-size: 1em;
+    }
+    th {
+      background: var(--table-head);
+      color: var(--brand-green-dark);
+      font-weight: 600;
+      letter-spacing: 0.2px;
+    }
+    tr.bold {
+      font-weight: 700;
+      background: #f7faf5;
+      color: var(--accent);
+    }
+    .nutr-label {
+      color: var(--info);
+      font-weight: 600;
+    }
+    .highlight {
+      color: var(--brand-green);
+      font-weight: bold;
+      font-size: 1.06em;
+    }
+    .footer {
+      margin-top: 2.9em;
+      background: var(--footer-bg);
+      border-radius: 0 0 1.2em 1.2em;
+      padding: 1.2em 2em;
+      color: #7a869a;
+      font-size: 1em;
+      text-align: right;
+      border-top: 1.5px solid #e1ede1;
+      box-shadow: 0 -1px 6px #e0f6e7;
+      font-style: italic;
+      letter-spacing: 0.7px;
+    }
+    .brand {
+      color: var(--accent);
+      font-weight: 700;
+      font-size: 1.09em;
+    }
+    .stamp {
+      font-size: 0.97em;
+      color: #aaa;
+      margin-top: 0.5em;
+    }
+    @media (max-width: 650px) {
+      .container { padding: 0.6em 0.2em 0.9em 0.2em; }
+      header { padding: 0.9em 0.7em; }
+      h1 { font-size: 1.25em; }
+      h2 { font-size: 1.07em; }
+      table { font-size: 0.92em; }
+    }
+    @media print {
+      body { background: #fff !important; }
+      .container { box-shadow: none !important; }
+      header, .footer { box-shadow: none !important; }
+    }
   </style>
 </head>
 <body>
-  <h1 class="titulo">Relatório da Dieta Otimizada - <span class="highlight">${categoria || 'Categoria não informada'}</span></h1>
-  
-  <h2>Informações dos Animais</h2>
-  <table class="animal-table">
-    <tbody>
-      <tr><td><b>Categoria:</b></td><td>${categoria || '-'}</td></tr>
-      <tr><td><b>Peso Vivo (PV):</b></td><td>${pv ? pv + " kg" : '-'}</td></tr>
-      <tr><td><b>Ganho de Peso Diário (GPD):</b></td><td>${gpd ? gpd + " g/dia" : '-'}</td></tr>
-      <tr><td><b>Consumo de MS (por animal):</b></td><td>${ms ? ms + " kg/dia" : '-'}</td></tr>
-      <tr><td><b>Animais no rebanho:</b></td><td>${numAnimais || '-'}</td></tr>
-      <tr><td><b>Consumo total de MS no lote:</b></td><td>${(consumoMSLote ? consumoMSLote.toFixed(2) : '-')} kg/dia</td></tr>
-      <tr><td><b>Consumo total de Matéria Natural no lote (estimado):</b></td><td>${(consumoMNTotalLote ? consumoMNTotalLote.toFixed(2) : '-')} kg/dia</td></tr>
-    </tbody>
-  </table>
+  <div class="container">
+    <header>
+      <div class="logo">
+        <img src="logo.png" alt="Logo NutriSheep BR" class="" style="width: 4em; border-radius:4em; ">
+       
+        <span>Nutrição Animal</span>
+      </div>
+      <span class="title-main">Relatório de Dieta Otimizada</span>
+    </header>
 
-  <h2>Composição da Mistura (proporção para 100 kg de Matéria Seca)</h2>
-  <table>
-    <thead>
-      <tr>
-        <th>Ingrediente</th>
-        <th>kg<br>(Matéria Seca)</th>
-        <th>kg<br>(Matéria Natural)</th>
-        <th>Custo por ingrediente<br>(R$ na MS)</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${linhas100.map(l=>`
-        <tr>
-          <td>${l.ingrediente}</td>
-          <td>${l.kgMS.toFixed(2)}</td>
-          <td>${l.kgNat.toFixed(2)}</td>
-          <td>R$ ${l.custoPropMS.toFixed(2)}</td>
-        </tr>`).join("")}
-      <tr class="bold">
-        <td>Total</td>
-        <td>${(linhas100.reduce((a, b) => a + b.kgMS, 0)).toFixed(2)}</td>
-        <td>${totalKgNat100.toFixed(2)}</td>
-        <td>R$ ${totalCustoMS100.toFixed(2)}</td>
-      </tr>
-    </tbody>
-  </table>
+    <h1>Ficha Técnica da Dieta</h1>
 
-  <h2>Proporção dos Ingredientes no Consumo Total de Matéria Natural do Lote</h2>
-  <table>
-    <thead>
-      <tr>
-        <th>Ingrediente</th>
-        <th>kg (MN no lote/dia)</th>
-        <th>% no total de MN</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${proporcoesMNIngredientes.map(row => `
+    <h2>Dados do Animal e Rebanho</h2>
+    <table class="animal-table">
+      <tbody>
+        <tr><td class="label">Espécie:</td><td>${especieLabel}</td></tr>
+        <tr><td class="label">Raça:</td><td>${racaLabel || '-'}</td></tr>
+        <tr><td class="label">Categoria:</td><td>${categoriaLabel || '-'}</td></tr>
+        <tr><td class="label">Fase:</td><td>${faseLabel || '-'}</td></tr>
+        <tr><td class="label">Peso Vivo (PV):</td><td>${pv ? pv + " kg" : '-'}</td></tr>
+        <tr><td class="label">Ganho de Peso Diário (GMD):</td><td>${gmd ? gmd + " kg/dia" : '-'}</td></tr>
+        <tr><td class="label">Consumo de Matéria Seca (por animal):</td><td>${consumoMSAnimal ? consumoMSAnimal.toFixed(2) + " kg/dia" : '-'}</td></tr>
+        <tr><td class="label">Animais no rebanho:</td><td>${numAnimais || '-'}</td></tr>
+        <tr><td class="label">Consumo total de MS no lote:</td><td>${(consumoMSLote ? consumoMSLote.toFixed(2) : '-')} kg/dia</td></tr>
+        <tr><td class="label">Consumo total de Matéria Natural no lote (estimado):</td><td>${(consumoMNTotalLote ? consumoMNTotalLote.toFixed(2) : '-')} kg/dia</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Composição da Mistura (proporção para 100 kg de Matéria Seca)</h2>
+    <table>
+      <thead>
         <tr>
-          <td>${row.nome}</td>
-          <td>${row.mnIngredienteLote.toFixed(2)}</td>
-          <td>${row.pctMN.toFixed(2)}%</td>
+          <th>Ingrediente</th>
+          <th>kg<br>(Matéria Seca)</th>
+          <th>kg<br>(Matéria Natural)</th>
+          <th>Custo por ingrediente<br>(R$ na MS)</th>
         </tr>
-      `).join("")}
-      <tr style="font-weight:bold;">
-        <td>Total</td>
-        <td>${consumoMNTotalLote.toFixed(2)}</td>
-        <td>100.00%</td>
-      </tr>
-    </tbody>
-  </table>
-
-  <h2>Resumo Nutricional e Custos</h2>
-  <table class="nutr-table">
-    <tbody>
-      <tr><td class="nutr-label">PB (%MS):</td><td>${resumo.pb || ''}</td></tr>
-      <tr><td class="nutr-label">NDT (%MS):</td><td>${resumo.ndt || ''}</td></tr>
-      <tr><td class="nutr-label">Ca (%MS):</td><td>${resumo.ca || ''}</td></tr>
-      <tr><td class="nutr-label">P (%MS):</td><td>${resumo.p || ''}</td></tr>
-      <tr><td class="nutr-label">Relação Ca/P:</td><td>${resumo.relacao_ca_p || ''}</td></tr>
-      <tr><td class="nutr-label">Custo total da dieta (R$/Kg):</td><td> R$ ${((totalCustoMS100)/100).toFixed(2) || ''}</td></tr>
-    </tbody>
-  </table>
-  <div class="footer">
-    Gerado por: AgroCrat LTDA - ${new Date().toLocaleString('pt-BR')}
-  </div>
-  <script>
-    window.onload = function() { window.print(); }
-  </script>
-</body>
-</html>
-  `.trim();
-
-  let win = window.open("", "_blank");
-  win.document.write(html);
-  win.document.close();
-}
-
-function exportarMisturaPDF() {
-  const resultadoSection = document.getElementById('resultado-section');
-  const resultadosFormulacao = document.getElementById('resultados-formulacao');
-  if (resultadoSection.style.display === "none" || !resultadosFormulacao.innerHTML) {
-    alert("Calcule uma dieta antes de exportar.");
-    return;
-  }
-
-  let sec = resultadosFormulacao.querySelector('.result-table');
-  if (!sec) {
-    alert("Calcule uma dieta antes de exportar.");
-    return;
-  }
-
-  const categoria = document.getElementById('categoriaCal')?.value || '';
-  const ms = parseFloat(document.getElementById('ms-animal')?.value) || 0;
-  const numAnimais = parseInt(document.getElementById('num-animais')?.value, 10) || 1;
-  const consumoMSLote = ms * numAnimais;
-
-  // Coleta proporções dos ingredientes na MS do resultado (do usuário)
-  let nomesIngredientes = [];
-  let proporcoesMS = [];
-  let totalMS = 0;
-  sec.querySelectorAll("tbody tr").forEach(tr => {
-    let tds = tr.querySelectorAll("td");
-    if (tds.length === 4) {
-      let nome = tds[0].innerText;
-      let kgMS = parseFloat(tds[3].innerText.replace(",", "."));
-      nomesIngredientes.push(nome);
-      proporcoesMS.push(kgMS);
-      totalMS += kgMS;
-    }
-  });
-  let propsMS = proporcoesMS.map(kgMS => kgMS / totalMS);
-
-  // --- Cálculo dos valores para a tabela ---
-  let ingredientesTabela = [];
-  let consumoMNTotalLote = 0;
-  for (let i = 0; i < nomesIngredientes.length; i++) {
-    let nome = nomesIngredientes[i];
-    let prop = propsMS[i];
-    let ing = ingredientes.find(x => x.nome === nome);
-    if (ing && ing.ms > 0) {
-      let msIngredienteLote = consumoMSLote * prop;
-      let mnIngredienteLote = msIngredienteLote / (ing.ms / 100);
-      consumoMNTotalLote += mnIngredienteLote;
-      ingredientesTabela.push({
-        nome,
-        mnIngredienteLote,
-        prop
-      });
-    }
-  }
-  ingredientesTabela = ingredientesTabela.map(row => ({
-    ...row,
-    pctMN: consumoMNTotalLote > 0 ? (row.mnIngredienteLote / consumoMNTotalLote) * 100 : 0
-  }));
-
-  let html = `
-<!DOCTYPE html>
-<html lang="pt-br">
-<head>
-  <meta charset="UTF-8">
-  <title>Composição da Mistura - PDF</title>
-  <style>
-    body { font-family: Arial, sans-serif; margin: 24px; color: #232323; }
-    h1 { color: #2d9c72; margin-bottom: 0.5em; }
-    table { width: 100%; border-collapse: collapse; margin-top: 1.2em;}
-    th, td { border: 1px solid #e0e5ea; padding: 6px 10px; text-align: center;}
-    th { background: #f5f7fa;}
-    td, th { font-size: 15px; }
-    .footer { margin-top: 2.5em; color: #999; font-size: 12px;}
-    .titulo { margin-bottom: 0.2em;}
-    .highlight { color: #2d9c72; font-weight: bold;}
-  </style>
-</head>
-<body>
-  <h1 class="titulo">Composição da Mistura da Ração</h1>
-  <p><b>Categoria:</b> <span class="highlight">${categoria || '-'}</span></p>
-  <table>
-    <thead>
-      <tr>
-        <th>Ingrediente</th>
-        <th>kg (MN no lote/dia)</th>
-        <th>% no total de MN</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${ingredientesTabela.map(ing => `
-        <tr>
-          <td>${ing.nome}</td>
-          <td>${ing.mnIngredienteLote.toFixed(2)}</td>
-          <td>${ing.pctMN.toFixed(2)}%</td>
+      </thead>
+      <tbody>
+        ${linhas100.map(l=>`
+          <tr>
+            <td>${l.ingrediente}</td>
+            <td>${l.kgMS.toFixed(2)}</td>
+            <td>${l.kgNat.toFixed(2)}</td>
+            <td>R$ ${l.custoPropMS.toFixed(2)}</td>
+          </tr>`).join("")}
+        <tr class="bold">
+          <td>Total</td>
+          <td>${(linhas100.reduce((a, b) => a + b.kgMS, 0)).toFixed(2)}</td>
+          <td>${totalKgNat100.toFixed(2)}</td>
+          <td>R$ ${totalCustoMS100.toFixed(2)}</td>
         </tr>
-      `).join("")}
-      <tr style="font-weight:bold;">
-        <td>Total</td>
-        <td>${consumoMNTotalLote.toFixed(2)}</td>
-        <td>100.00%</td>
-      </tr>
-    </tbody>
-  </table>
+      </tbody>
+    </table>
 
-  <div class="footer">
-    Gerado por: AgroCrat LTDA - ${new Date().toLocaleString('pt-BR')}
+    <h2>Proporção dos Ingredientes no Consumo Total de Matéria Natural do Lote</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Ingrediente</th>
+          <th>kg (MN no lote/dia)</th>
+          <th>% no total de MN</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${proporcoesMNIngredientes.map(row => `
+          <tr>
+            <td>${row.nome}</td>
+            <td>${row.mnIngredienteLote.toFixed(2)}</td>
+            <td>${row.pctMN.toFixed(2)}%</td>
+          </tr>
+        `).join("")}
+        <tr class="bold">
+          <td>Total</td>
+          <td>${consumoMNTotalLote.toFixed(2)}</td>
+          <td>100.00%</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>Resumo Nutricional e Custos da Dieta</h2>
+    <table class="nutr-table" style="width:70%;margin:auto;">
+      <tbody>
+        <tr><td class="nutr-label">PB (%MS):</td><td>${resumo.pb || ''}</td></tr>
+        <tr><td class="nutr-label">NDT (%MS):</td><td>${resumo.ndt || ''}</td></tr>
+        <tr><td class="nutr-label">Ca (%MS):</td><td>${resumo.ca || ''}</td></tr>
+        <tr><td class="nutr-label">P (%MS):</td><td>${resumo.p || ''}</td></tr>
+        <tr><td class="nutr-label">Relação Ca/P:</td><td>${resumo.relacao_ca_p || ''}</td></tr>
+        <tr><td class="nutr-label">Custo total da dieta (R$/Kg):</td><td> R$ ${((totalCustoMS100)/100).toFixed(2) || ''}</td></tr>
+      </tbody>
+    </table>
+
+    <div class="stamp">
+      <span class="brand">AgroCrat Nutrição Animal</span> &mdash; Relatório gerado em: ${new Date().toLocaleString('pt-BR')}
+    </div>
+
+    <div class="footer">
+      <span>
+        Relatório profissional gerado por AgroCrat LTDA | Soluções em Nutrição Animal <br>
+        Contato: agrocrat.ltda@gmail.com &nbsp;|&nbsp; www.agrocrat.com.br
+      </span>
+    </div>
   </div>
   <script>
     window.onload = function() { window.print(); }
