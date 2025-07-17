@@ -524,9 +524,7 @@ function calcularRequerimentos() {
           <strong>Ganho corpo vazio:</strong> ${gpcvz.toFixed(3)} kg/dia
         </div>
       </div>
-       <div class="result-card bg-mineral mb-2">
-        ${tabelaMinerais(minerais)}
-      </div>
+      
     </div>
     <div class="col-12 col-sm-6">
       <div class="result-card bg-cms mb-2">
@@ -550,16 +548,21 @@ function calcularRequerimentos() {
           <small>(${ndtPercent.toFixed(1)}% da MS)</small>
         </div>
       </div>
-     
-
-
-      <div class="result-card bg-vitamina mb-2">
-        ${tabelaVitaminas(vitaminas)}
-      </div>
-      <div class="result-card bg-fibra mb-2">
-        ${tabelaFracoes(frafibe)}
-      </div>
+    
     </div>
+      <div class="col-12 col-sm-6">
+        <div class="result-card bg-mineral mb-2">
+            ${tabelaMinerais(minerais)}
+          </div>
+       </div>
+       <div class="col-12 col-sm-6">
+        <div class="result-card bg-vitamina mb-2">
+          ${tabelaVitaminas(vitaminas)}
+        </div>
+        <div class="result-card bg-fibra mb-2">
+        ${tabelaFracoes(frafibe)}
+        </div>
+       </div>
     <div class="col-12">
       <div class="result-card bg-recomendacao mb-2">
         <span class="result-icon"><i class="bi bi-lightbulb text-brand"></i></span>
